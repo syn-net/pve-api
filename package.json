@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "main": "index.mjs",
   "author": "Jeffrey Carpenter <1329364+i8degrees@users.noreply.github.com>",
-  "license": "BSD-CLAUSE-3",
+  "license": "BSD-3-Clause",
   "private": false,
   "scripts": {
     "start": "USE_TLS=0 node -r dotenv/config index.mjs",

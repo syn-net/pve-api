@@ -1,3 +1,6 @@
 .env
 !.env.default
+SCRATCHPAD.md
+
 node_modules
+

@@ -5,12 +5,23 @@
 
 `use strict`
 
+// import {assert} from 'node:util';
 // import {readFile} from 'node:fs';
 import process from 'node:process';
 import {
   parseBoolean,
   fetch
 } from './lib/utils.mjs';
+
+import {
+  containerUnlock,
+  containerLock,
+} from './lib/pct-api.mjs';
+
+import {
+  virtualMachineUnlock,
+  virtualMachineLock,
+} from './lib/qm-api.mjs';
 
 const args = process.argv;
 
@@ -21,6 +32,9 @@ const RPORT = Math.abs(process.env[`REMOTE_PORT`]) || 8006;
 const RHOST = process.env[`REMOTE_HOSTNAME`] || `scorpio-pve.lan`;
 const useTLS = parseBoolean(process.env[`USE_TLS`]) || true;
 const proto = parseBoolean(useTLS) == true ? `HTTPS` : `HTTP`;
+
+const TYPES_QEMU = `qemu`;
+const TYPES_LXC = `lxc`;
 
 const postData = JSON.stringify({
   type: `vm`, // node, storage, ...
@@ -64,7 +78,50 @@ const req = fetch(fetchOptions, (res) => {
       console.info(`HEADERS: ${JSON.stringify(res.headers)}`);
       console.info(`BODY: ${chunk}`);
     } else {
-      console.log(`${chunk}`);
+      const jsonOutput = JSON.parse(chunk);
+      const containers = jsonOutput[`data`];
+
+      let runningContainers = [];
+      containers.forEach((value, index) => {
+        if(value) {
+          const type = containers[index].type;
+          const vmId = containers[index].vmid;
+          const name = containers[index].name;
+          const status = containers[index].status;
+          console.info(`${name} - ${type} - ${vmId}...${status}`);
+          if(status != `stopped`) {
+            runningContainers.push(containers[index]);
+          }
+        }
+      });
+
+      const totalNumRunningContainers = runningContainers.length;
+      console.log(`totalNumRunningContainers: ${totalNumRunningContainers}`);
+
+      let lxcContainers = [];
+      let qemuContainers = [];
+      runningContainers.forEach((value, index) => {
+        if(value) {
+          const type = runningContainers[index].type;
+          const vmId = runningContainers[index].vmid;
+          const name = runningContainers[index].name;
+          const status = runningContainers[index].status;
+          if(type === TYPES_QEMU) {
+            qemuContainers.push(runningContainers[index]);
+          } else if(type === TYPES_LXC) {
+            lxcContainers.push(runningContainers[index]);
+          }
+        }
+      });
+      
+      // assert.isDeepStrictEqual
+      // assert(containerLock(103), false);
+      // assert(virtualMachineLock(100), false);
+
+      const numQemuContainers = qemuContainers.length;
+      const numLxcContainers = lxcContainers.length;
+      console.log(`numQemuContainers: ${numQemuContainers}`);
+      console.log(`numLxcContainers: ${numLxcContainers}`);
     }
   });
 

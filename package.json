@@ -7,11 +7,18 @@
   "license": "BSD-3-Clause",
   "private": false,
   "scripts": {
-    "start": "USE_TLS=0 node -r dotenv/config index.mjs",
+    "start": "run-s start:ssl",
+    "start:nossl": "USE_TLS=0 node -r dotenv/config index.mjs",
     "start:ssl": "NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt node -r dotenv/config index.mjs",
-    "test": "node index.mjs"
+    "test": "run-p test:*",
+    "test:ssl": "run-s start:ssl",
+    "test:nossl": "run-s start:nossl"
   },
   "dependencies": {
     "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "jq": "^1.7.2",
+    "npm-run-all": "^4.1.5"
   }
 }

@@ -7,7 +7,10 @@
 
 // import {readFile} from 'node:fs';
 import process from 'node:process';
-import {fetch} from './lib/utils.mjs';
+import {
+  parseBoolean,
+  fetch
+} from './lib/utils.mjs';
 
 const args = process.argv;
 
@@ -15,12 +18,9 @@ const DEBUG = process.env['DEBUG'] || false;
 const pveAuthKey = process.env['PVE_AUTH_KEY'] || ``;
 
 const RPORT = Math.abs(process.env[`REMOTE_PORT`]) || 8006;
-//hostname: `192.168.15.238`,
 const RHOST = process.env[`REMOTE_HOSTNAME`] || `scorpio-pve.lan`;
-const useTLS = (process.env[`USE_TLS`]) || true;
-const proto =
-  useTLS && useTLS == true ?
-`HTTPS` : `HTTP`;
+const useTLS = parseBoolean(process.env[`USE_TLS`]) || true;
+const proto = parseBoolean(useTLS) == true ? `HTTPS` : `HTTP`;
 
 const postData = JSON.stringify({
   type: `vm`, // node, storage, ...

@@ -5,12 +5,12 @@
 
 `use strict`
 
-// import {assert} from 'node:util';
-// import {readFile} from 'node:fs';
+import assert from 'node:assert';
 import process from 'node:process';
 import {
   parseBoolean,
-  fetch
+  fetch,
+  shell,
 } from './lib/utils.mjs';
 
 import {
@@ -23,10 +23,13 @@ import {
   virtualMachineLock,
 } from './lib/qm-api.mjs';
 
+const debugAssert = assert.strict.strictEqual;
+
 const args = process.argv;
 
-const DEBUG = process.env['DEBUG'] || false;
-const pveAuthKey = process.env['PVE_AUTH_KEY'] || ``;
+const DEBUG = parseBoolean(process.env[`DEBUG`]) || false;
+const DRY_RUN = parseBoolean(process.env[`DRY_RUN`]) || false;
+const pveAuthKey = process.env[`PVE_AUTH_KEY`] || ``;
 
 const RPORT = Math.abs(process.env[`REMOTE_PORT`]) || 8006;
 const RHOST = process.env[`REMOTE_HOSTNAME`] || `scorpio-pve.lan`;
@@ -63,65 +66,65 @@ console.debug();
 console.debug(`Beginning ${proto} request to ${fetchOptions.hostname}...`);
 console.debug();
 
-args.forEach((val, index) => {
-  if(val) {
-    console.debug(`arg[${index}: ${val}`);
+args.forEach((arg, pos) => {
+  if(arg) {
+    console.debug(`arg[${pos}: ${arg}`);
   }
 });
 
 const req = fetch(fetchOptions, (res) => {
   res.setEncoding('utf8');
 
-  res.on(`data`, (chunk) => {
+  res.on(`data`, (body) => {
     if(DEBUG) {
       console.info(`STATUS: ${res.statusCode}`);
       console.info(`HEADERS: ${JSON.stringify(res.headers)}`);
-      console.info(`BODY: ${chunk}`);
-    } else {
-      const jsonOutput = JSON.parse(chunk);
-      const containers = jsonOutput[`data`];
+      console.info(`BODY: ${body}`);
+    }
+
+    if(body && body.length > 0) {
+      const jsonBody = JSON.parse(body);
+      const containers = jsonBody[`data`];
 
       let runningContainers = [];
-      containers.forEach((value, index) => {
-        if(value) {
-          const type = containers[index].type;
-          const vmId = containers[index].vmid;
-          const name = containers[index].name;
-          const status = containers[index].status;
-          console.info(`${name} - ${type} - ${vmId}...${status}`);
-          if(status != `stopped`) {
-            runningContainers.push(containers[index]);
+      containers.forEach((container, index) => {
+        if(container) {
+          console.info(`${container.name}: ${container.type} - ${container.vmid}...${container.status}`);
+          if(container.status === `running`) {
+            runningContainers.push(container);
+          }
+        }
+      });
+
+      let lxcContainers = [];
+      let qemuContainers = [];
+      runningContainers.forEach((container, index) => {
+        if(container) {
+          console.info(`${container.name}: ${container.type} - ${container.vmid}...${container.status}`);
+          if(container.type === TYPES_QEMU) {
+            qemuContainers.push(container);
+          } else if(container.type === TYPES_LXC) {
+            lxcContainers.push(container);
           }
         }
       });
 
       const totalNumRunningContainers = runningContainers.length;
-      console.log(`totalNumRunningContainers: ${totalNumRunningContainers}`);
-
-      let lxcContainers = [];
-      let qemuContainers = [];
-      runningContainers.forEach((value, index) => {
-        if(value) {
-          const type = runningContainers[index].type;
-          const vmId = runningContainers[index].vmid;
-          const name = runningContainers[index].name;
-          const status = runningContainers[index].status;
-          if(type === TYPES_QEMU) {
-            qemuContainers.push(runningContainers[index]);
-          } else if(type === TYPES_LXC) {
-            lxcContainers.push(runningContainers[index]);
-          }
-        }
-      });
-      
-      // assert.isDeepStrictEqual
-      // assert(containerLock(103), false);
-      // assert(virtualMachineLock(100), false);
-
       const numQemuContainers = qemuContainers.length;
       const numLxcContainers = lxcContainers.length;
+      console.log(`totalNumRunningContainers: ${totalNumRunningContainers}`);
       console.log(`numQemuContainers: ${numQemuContainers}`);
       console.log(`numLxcContainers: ${numLxcContainers}`);
+
+      // shell(`echo "hi"`, {
+      //   encoding: `utf8`,
+      //   dryRun: DRY_RUN,
+      // });
+      // assert.isDeepStrictEqual
+      debugAssert(containerLock(104, {
+        dryRun: DRY_RUN,
+      }), false);
+      // debugAssert(virtualMachineLock(100), false);
     }
   });
 

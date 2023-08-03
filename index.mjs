@@ -5,7 +5,7 @@
 
 `use strict`
 
-import {resolve} from 'path';
+import {resolve} from 'node:path';
 import {argv, env, cwd} from 'node:process';
 import * as dotenv from 'dotenv';
 dotenv.config({

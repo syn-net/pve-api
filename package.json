@@ -8,8 +8,8 @@
   "private": false,
   "scripts": {
     "start": "run-s start:ssl",
-    "start:nossl": "USE_TLS=0 node -r dotenv/config index.mjs",
-    "start:ssl": "NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt node -r dotenv/config index.mjs",
+    "start:nossl": "USE_TLS=0 node --use-openssl-ca index.mjs",
+    "start:ssl": "node --use-openssl-ca index.mjs",
     "test": "run-p test:*",
     "test:ssl": "run-s start:ssl",
     "test:nossl": "run-s start:nossl",

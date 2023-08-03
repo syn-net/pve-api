@@ -5,8 +5,13 @@
 
 `use strict`
 
+import {resolve} from 'path';
+import {argv, env, cwd} from 'node:process';
+import * as dotenv from 'dotenv';
+dotenv.config({
+  path: resolve(cwd(), `.env`),
+});
 import assert from 'node:assert';
-import process from 'node:process';
 import {
   parseBoolean,
   fetch,
@@ -25,15 +30,15 @@ import {
 
 const debugAssert = assert.strict.strictEqual;
 
-const args = process.argv;
+const args = argv;
 
-const DEBUG = parseBoolean(process.env[`DEBUG`]) || false;
-const DRY_RUN = parseBoolean(process.env[`DRY_RUN`]) || false;
-const pveAuthKey = process.env[`PVE_AUTH_KEY`] || ``;
+const DEBUG = parseBoolean(env[`DEBUG`]) || false;
+const DRY_RUN = parseBoolean(env[`DRY_RUN`]) || false;
+const pveAuthKey = env[`PVE_AUTH_KEY`] || ``;
 
-const RPORT = Math.abs(process.env[`REMOTE_PORT`]) || 8006;
-const RHOST = process.env[`REMOTE_HOSTNAME`] || `scorpio-pve.lan`;
-const useTLS = parseBoolean(process.env[`USE_TLS`]) || true;
+const RPORT = Math.abs(env[`REMOTE_PORT`]) || 8006;
+const RHOST = env[`REMOTE_HOSTNAME`] || `scorpio-pve.lan`;
+const useTLS = parseBoolean(env[`USE_TLS`]) || true;
 const proto = parseBoolean(useTLS) == true ? `HTTPS` : `HTTP`;
 
 const TYPES_QEMU = `qemu`;

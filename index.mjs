@@ -3,15 +3,17 @@
 // 1. https://nodejs.org/api/http.html
 // 2. https://nodejs.org/api/single-executable-applications.html
 
-`use strict`
+`use strict`;
 
+import assert from 'node:assert';
 import {resolve} from 'node:path';
 import {argv, env, cwd} from 'node:process';
+
 import * as dotenv from 'dotenv';
 dotenv.config({
   path: resolve(cwd(), `.env`),
 });
-import assert from 'node:assert';
+
 import {
   parseBoolean,
   fetch,

@@ -16,8 +16,9 @@
     "lint": "run-p lint:*",
     "lint:package": "cat package.json | json_verify -q",
     "lint:lib": "exit 0",
-    "build": "run-s clean; run-p build:*; run-s lint",
+    "build": "run-s clean; run-s lint; run-p build:*",
     "build:cjs": "rollup --format=cjs --file=dist/index.cjs -- index.mjs",
+    "build:exe": "pkg --compress brotli --output dist/pve-api -t node14-linux --options use-openssl-ca dist/index.cjs",
     "clean": "run-p clean:*",
     "clean:dist": "rm -v dist/*"
   },
@@ -27,6 +28,15 @@
   "devDependencies": {
     "jq": "^1.7.2",
     "npm-run-all": "^4.1.5",
+    "pkg": "^5.8.1",
     "rollup": "^3.27.0"
-  }
+  },
+  "files": [
+    "index.mjs",
+    "README.md",
+    "LICENSE.md",
+    "dist",
+    "lib",
+    "tests"
+  ]
 }

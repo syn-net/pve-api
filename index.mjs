@@ -19,11 +19,13 @@ import {
 } from './lib/utils.mjs';
 
 import {
+  containerStatus,
   containerUnlock,
   containerLock,
 } from './lib/pct-api.mjs';
 
 import {
+  virtualMachineStatus,
   virtualMachineUnlock,
   virtualMachineLock,
 } from './lib/qm-api.mjs';
@@ -121,15 +123,41 @@ const req = fetch(fetchOptions, (res) => {
       console.log(`numQemuContainers: ${numQemuContainers}`);
       console.log(`numLxcContainers: ${numLxcContainers}`);
 
+      const containerOptions = {
+        dryRun: DRY_RUN,
+      };
+
+      lxcContainers.forEach((container, index) => {
+        if(container && container.vmid && Math.abs(container.vmid) > 99) {
+          const id = container.vmid;
+          console.debug(`Locking ${id}...`);
+          containerLock(id, containerOptions);
+        }
+      });
+
+      qemuContainers.forEach((container, index) => {
+        if(container && container.vmid && Math.abs(container.vmid) > 99) {
+          const id = container.vmid;
+          console.debug(`Locking ${id}...`);
+          virtualMachineLock(id, containerOptions);
+        }
+      });
+
+      qemuContainers.forEach((container, index) => {
+        if(container && container.vmid && Math.abs(container.vmid) > 99) {
+          const id = container.vmid;
+          console.debug(`Unlocking ${id}...`);
+          virtualMachineUnlock(id, containerOptions);
+        }
+      });
+
       // shell(`echo "hi"`, {
       //   encoding: `utf8`,
       //   dryRun: DRY_RUN,
       // });
       // assert.isDeepStrictEqual
-      debugAssert(containerLock(104, {
-        dryRun: DRY_RUN,
-      }), false);
-      // debugAssert(virtualMachineLock(100), false);
+      debugAssert(containerLock(104, containerOptions), false);
+      debugAssert(virtualMachineLock(100, containerOptions), false);
     }
   });
 

@@ -2,5 +2,7 @@
 !.env.default
 SCRATCHPAD.md
 
+dist/*
+!dist/.placeholder
 node_modules
 

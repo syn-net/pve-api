@@ -1,4 +1,9 @@
 {
+  "engines": {
+    "node": "^16",
+    "npm": "^8",
+    "yarn": "^1.22"
+  },
   "type": "module",
   "name": "pve-api",
   "version": "0.0.1",

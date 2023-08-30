@@ -16,7 +16,8 @@ dotenv.config({
 
 import {
   parseBoolean,
-  fetch,
+  request,
+  secureRequest,
   shell,
 } from './lib/utils.mjs';
 
@@ -24,25 +25,30 @@ import {
   containerStatus,
   containerUnlock,
   containerLock,
+  containerFreeze,
+  containerThaw,
 } from './lib/pct-api.mjs';
 
 import {
   virtualMachineStatus,
   virtualMachineUnlock,
   virtualMachineLock,
+  virtualMachineFreeze,
+  virtualMachineThaw,
 } from './lib/qm-api.mjs';
 
 const debugAssert = assert.strict.strictEqual;
 
 const args = argv;
+const argc = argv.length - 1;
 
-const DEBUG = parseBoolean(env[`DEBUG`]) || false;
-const DRY_RUN = parseBoolean(env[`DRY_RUN`]) || false;
+const DEBUG = parseBoolean(env[`DEBUG`]);
+const DRY_RUN = parseBoolean(env[`DRY_RUN`]);
 const pveAuthKey = env[`PVE_AUTH_KEY`] || ``;
 
 const RPORT = Math.abs(env[`REMOTE_PORT`]) || 8006;
 const RHOST = env[`REMOTE_HOSTNAME`] || `scorpio-pve.lan`;
-const useTLS = parseBoolean(env[`USE_TLS`]) || true;
+const useTLS = parseBoolean(env[`USE_TLS`]);
 const proto = parseBoolean(useTLS) == true ? `HTTPS` : `HTTP`;
 
 const TYPES_QEMU = `qemu`;
@@ -52,10 +58,10 @@ const postData = JSON.stringify({
   type: `vm`, // node, storage, ...
 });
 
+//https://scorpio-pve.lan:8006/api2/json/nodes/scorpio-pve/lxc/106/config
 const fetchOptions = {
   hostname: RHOST,
   port: RPORT,
-  //https://scorpio-pve.lan:8006/api2/json/nodes/scorpio-pve/lxc/106/config
   path: `/api2/json/cluster/resources?type=vm`,
   method: `GET`,
   headers: {
@@ -66,113 +72,135 @@ const fetchOptions = {
 };
 
 if(pveAuthKey && pveAuthKey.length > 0) {
-  console.debug(`An authorization key was found with the value of... ${pveAuthKey}`);
+  console.debug(`An authorization key was found with the value of... ${pveAuthKey}\n`);
 } else {
-  console.debug(`No authorization key was found...`);
+  console.debug(`No authorization key was found...\n`);
 }
-console.debug();
 
-console.debug(`Beginning ${proto} request to ${fetchOptions.hostname}...`);
-console.debug();
+console.info(`Beginning ${proto} request to ${fetchOptions.hostname}...\n`);
 
-args.forEach((arg, pos) => {
-  if(arg) {
-    console.debug(`arg[${pos}: ${arg}`);
-  }
-});
+const fetch = parseBoolean(useTLS) == true ? secureRequest : request;
 
-const req = fetch(fetchOptions, (res) => {
-  res.setEncoding('utf8');
-
-  res.on(`data`, (body) => {
-    if(DEBUG) {
-      console.info(`STATUS: ${res.statusCode}`);
-      console.info(`HEADERS: ${JSON.stringify(res.headers)}`);
-      console.info(`BODY: ${body}`);
-    }
-
-    if(body && body.length > 0) {
-      const jsonBody = JSON.parse(body);
-      const containers = jsonBody[`data`];
-
-      let runningContainers = [];
-      containers.forEach((container, index) => {
-        if(container) {
-          console.info(`${container.name}: ${container.type} - ${container.vmid}...${container.status}`);
-          if(container.status === `running`) {
-            runningContainers.push(container);
-          }
-        }
-      });
-
-      let lxcContainers = [];
-      let qemuContainers = [];
-      runningContainers.forEach((container, index) => {
-        if(container) {
-          console.info(`${container.name}: ${container.type} - ${container.vmid}...${container.status}`);
-          if(container.type === TYPES_QEMU) {
-            qemuContainers.push(container);
-          } else if(container.type === TYPES_LXC) {
-            lxcContainers.push(container);
-          }
-        }
-      });
-
-      const totalNumRunningContainers = runningContainers.length;
-      const numQemuContainers = qemuContainers.length;
-      const numLxcContainers = lxcContainers.length;
-      console.log(`totalNumRunningContainers: ${totalNumRunningContainers}`);
-      console.log(`numQemuContainers: ${numQemuContainers}`);
-      console.log(`numLxcContainers: ${numLxcContainers}`);
-
-      const containerOptions = {
-        dryRun: DRY_RUN,
-      };
-
-      lxcContainers.forEach((container, index) => {
-        if(container && container.vmid && Math.abs(container.vmid) > 99) {
-          const id = container.vmid;
-          console.debug(`Locking ${id}...`);
-          containerLock(id, containerOptions);
-        }
-      });
-
-      qemuContainers.forEach((container, index) => {
-        if(container && container.vmid && Math.abs(container.vmid) > 99) {
-          const id = container.vmid;
-          console.debug(`Locking ${id}...`);
-          virtualMachineLock(id, containerOptions);
-        }
-      });
-
-      qemuContainers.forEach((container, index) => {
-        if(container && container.vmid && Math.abs(container.vmid) > 99) {
-          const id = container.vmid;
-          console.debug(`Unlocking ${id}...`);
-          virtualMachineUnlock(id, containerOptions);
-        }
-      });
-
-      // shell(`echo "hi"`, {
-      //   encoding: `utf8`,
-      //   dryRun: DRY_RUN,
-      // });
-      // assert.isDeepStrictEqual
-      debugAssert(containerLock(104, containerOptions), false);
-      debugAssert(virtualMachineLock(100, containerOptions), false);
+const main = async function(argc, argv) {
+  args.forEach((arg, pos) => {
+    if(arg) {
+      console.debug(`arg[${pos}: ${arg}`);
     }
   });
 
-  res.on(`end`, () => {
-    console.debug(`EOF`);
+  let lxcContainers = [];
+  let qemuContainers = [];
+
+  const req = await fetch(fetchOptions, async (res) => {
+    res.setEncoding('utf8');
+
+    res.on(`data`, (body) => {
+      if(DEBUG) {
+        console.info(`STATUS: ${res.statusCode}`);
+        console.info(`HEADERS: ${JSON.stringify(res.headers)}`);
+        console.info(`BODY: ${body}`);
+      }
+
+      if(body && body.length > 0) {
+        const jsonBody = JSON.parse(body);
+        const containers = jsonBody[`data`];
+
+        let runningContainers = [];
+        containers.forEach((container, index) => {
+          if(container) {
+            console.debug(`${container.name}: ${container.type} - ${container.vmid}...${container.status}`);
+            if(container.status === `running`) {
+              runningContainers.push(container);
+            }
+          }
+        });
+
+        runningContainers.forEach((container, index) => {
+          if(container) {
+            console.debug(`${container.name}: ${container.type} - ${container.vmid}...${container.status}`);
+            if(container.type === TYPES_QEMU) {
+              qemuContainers.push(container);
+            } else if(container.type === TYPES_LXC) {
+              lxcContainers.push(container);
+            }
+          }
+        });
+
+        const totalNumRunningContainers = runningContainers.length;
+        const numQemuContainers = qemuContainers.length;
+        const numLxcContainers = lxcContainers.length;
+        console.log(`totalNumRunningContainers: ${totalNumRunningContainers}`);
+        console.log(`numQemuContainers: ${numQemuContainers}`);
+        console.log(`numLxcContainers: ${numLxcContainers}`);
+
+
+        // shell(`echo "hi"`, {
+        //   encoding: `utf8`,
+        //   dryRun: DRY_RUN,
+        // });
+
+        // assert.isDeepStrictEqual
+        // debugAssert(containerLock(104, {
+        //   dryRun: DRY_RUN,
+        // }), false);
+      }
+
+      qemuContainers.forEach(async (container, pos) => {
+        if(container.status === "running") {
+          await virtualMachineLock(container.vmid);
+        }
+      });
+
+      qemuContainers.forEach(async (container, pos) => {
+        if(container.status === "running") {
+          await virtualMachineFreeze(container.vmid);
+        }
+      });
+
+      qemuContainers.forEach(async (container, pos) => {
+        if(container.status === "running") {
+          await virtualMachineThaw(container.vmid);
+        }
+      });
+
+      qemuContainers.forEach(async (container, pos) => {
+        if(container.status === "running") {
+          await virtualMachineUnlock(container.vmid);
+        }
+      });
+
+      lxcContainers.forEach(async (container, pos) => {
+        if(container.status === "running") {
+          await containerLock(container.vmid);
+        }
+      });
+
+      lxcContainers.forEach(async (container, pos) => {
+        if(container.status === "running") {
+          await containerFreeze(container.vmid);
+        }
+      });
+
+      lxcContainers.forEach(async (container, pos) => {
+        if(container.status === "running") {
+          await containerUnlock(container.vmid);
+        }
+      });
+    });
+
+    res.on(`end`, () => {
+      console.debug(`EOF`);
+    });
   });
-});
 
 
-req.on(`error`, (e) => {
-  console.error(`ERROR: ${e}`);
-});
+  req.on(`error`, (e) => {
+    console.error(`ERROR: ${e}`);
+  });
 
-//req.write(`OK`);
-//req.write(postData);
-req.end();
+  //req.write(`OK`);
+  //req.write(postData);
+  req.end();
+}
+
+await main(argc, argv);
